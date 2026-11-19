@@ -26,7 +26,7 @@ class VapourBinaryDiffusionCoefficient:
     """Standard fitting function to describe the temperature dependence
     of the binary diffusion coeffient for evaporated solvent in air.
 
-    The functional form of this is taken from Xie et al., Indoor Air (2007).
+    The functional form of this is taken from Xie et al., Indoor Air (200.
     """
     D_ref: float   # m^2/s
     T_ref: float   # K
@@ -96,7 +96,7 @@ molar_mass_water = 2*periodic_table.H.MW + periodic_table.O.MW # g/mol
 def density_water(temperature):
     """Fit for the density of pure water used in J Walker model.
 
-    Originally from:
+    Originally fro
 
         Wagner and Pruss Addendum to J. Phys. Chem. Ref. Data 16, 893 (1987),
         J. Phys. Chem. Ref. Data, 1993, 22, 783–787)
@@ -782,3 +782,112 @@ if __name__ == '__main__':
     plt.xlabel('T (℃)')
     plt.ylabel('Surface tension / N / m')
     plt.show()
+
+# +
+
+# Setting up Nonanal as a a solvent
+
+molar_mass_nonanal = 9*periodic_table.C.MW + 18*periodic_table.H.MW + periodic_table.O.MW # g/mol
+
+def density_nonanal(T):
+    """Density of butanol as function of temperature.
+
+    Functional form and fit parameters taken from (T_min, T_max = 213, 558):
+    http://ddbonline.ddbst.de/DIPPR105DensityCalculation/DIPPR105CalculationCGI.exe
+
+    Args:
+        T: temperature in Kelvin.
+    Returns:
+        The butanol density in kg/m^3.
+    """
+
+    A, B, C, D =  9.87035, 0.0998069, 568.017, 0.126276
+    return rackett_equation(A, B, C, D, T)
+
+def specific_heat_capacity_nonanal(T):
+    """Specific heat capacity of butanol vs temperature.
+
+    Lacking better data, we assume this is constant wrt temperature taking
+    numerical values from NIST:
+    https://webbook.nist.gov/cgi/cbook.cgi?ID=C71238&Mask=2
+
+    Args:
+        T: temperature in Kelvin (though not currently used).
+    Returns:
+        Specific heat capacity in J/K/kg.
+    """
+
+    molar_heat_capacity_butanol = 177 # J/K/mol
+    return molar_heat_capacity_butanol / molar_mass_butanol * 1000 # J/K/kg
+
+def specific_latent_heat_nonanal(T):
+    """Enthalpy of vaporisation per unit mass.
+
+    Functional form and parameters taken from Majer and Svoboda (1985), as referenced by NIST here:
+    https://webbook.nist.gov/cgi/cbook.cgi?ID=C78922&Mask=4
+
+    Fit parameters for temperature range 298 - 372 K:
+        A (kJ/mol)  52.6
+        alpha       -1.462
+        beta         1.0701
+        Tc (K)     536.
+
+    Args:
+        T: temperature in Kelvin.
+    Returns:
+        Specific latent heat in J/kg.
+    """
+
+    A, alpha, beta, T_c = 52.6, -1.462, 1.0701, 536
+    H_vap = enthalpy_vapourisation(50.43, -0.4475, 0.4989, 513.9, T) # J / mol
+    return 1e-3 * H_vap / molar_mass_butanol # J / kg
+
+def equilibrium_vapour_pressure_nonanal(T):
+    """Parameterisation of vapour pressure for butanol vs temperature.
+
+    Parameterisation taken from:
+    https://webbook.nist.gov/cgi/cbook.cgi?ID=C71363&Mask=4&Type=ANTOINE&Plot=on
+
+    This particular fit is probabaly a bit inaccurate below 20 deg c.
+
+    Args:
+       T: temperature in Kelvin.
+    Returns:
+       Vapour pressure in Pa.
+    """
+
+    P_bar = antoine_equation(T, 4.55, 1351.56, -93.34)
+    # Parameterisation above give pressure in bars, so we convert into Pa:
+    return 1e5 * P_bar
+
+def surface_tension_nonanal(T):
+    """Surface tension of ethanol as a function of temperature.
+
+    Functional form and parameters taken from:
+    http://ddbonline.ddbst.de/DIPPR106SFTCalculation/DIPPR106SFTCalculationCGI.exe
+
+    DIPPR106 parameters:
+        A     72.697
+        B       3.0297
+        C      -4.2681
+        D       2.4776
+        E       0
+        Tc    562.9
+        Tmin  238
+        Tmax  543
+
+    Args:
+        T: temperature in Kelvin.
+    Returns:
+        Surface tension in N/m.
+    """
+
+    return surface_tension(72.697, 3.0297, -4.2681, 2.4776,0, 562.9, T)
+
+Nonanal = Solvent(molar_mass_nonanal,
+                density_nonanal,
+                specific_heat_capacity_nonanal,
+                specific_latent_heat_nonanal,
+                equilibrium_vapour_pressure_nonanal,
+                VapourBinaryDiffusionCoefficient(0.2190e-4, T_freezing, 1.81),
+                surface_tension_nonanal)
